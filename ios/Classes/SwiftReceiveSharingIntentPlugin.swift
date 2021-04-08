@@ -6,38 +6,38 @@ public class SwiftReceiveSharingIntentPlugin: NSObject, FlutterPlugin, FlutterSt
     static let kMessagesChannel = "receive_sharing_intent/messages";
     static let kEventsChannelMedia = "receive_sharing_intent/events-media";
     static let kEventsChannelLink = "receive_sharing_intent/events-text";
-    
+
     private var customSchemePrefix = "ShareMedia";
-    
+
     private var initialMedia: [SharedMediaFile]? = nil
     private var latestMedia: [SharedMediaFile]? = nil
-    
+
     private var initialText: String? = nil
     private var latestText: String? = nil
-    
+
     private var eventSinkMedia: FlutterEventSink? = nil;
     private var eventSinkText: FlutterEventSink? = nil;
-    
+
     // Singleton is required for calling functions directly from AppDelegate
     // - it is required if the developer is using also another library, which requires to call "application(_:open:options:)"
     // -> see Example app
     public static let instance = SwiftReceiveSharingIntentPlugin()
-    
+
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: kMessagesChannel, binaryMessenger: registrar.messenger())
         registrar.addMethodCallDelegate(instance, channel: channel)
-        
+
         let chargingChannelMedia = FlutterEventChannel(name: kEventsChannelMedia, binaryMessenger: registrar.messenger())
         chargingChannelMedia.setStreamHandler(instance)
-        
+
         let chargingChannelLink = FlutterEventChannel(name: kEventsChannelLink, binaryMessenger: registrar.messenger())
         chargingChannelLink.setStreamHandler(instance)
-        
+
         registrar.addApplicationDelegate(instance)
     }
-    
+
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        
+
         switch call.method {
         case "getInitialMedia":
             result(toJson(data: self.initialMedia));
@@ -62,7 +62,7 @@ public class SwiftReceiveSharingIntentPlugin: NSObject, FlutterPlugin, FlutterSt
         }
         return false
     }
-    
+
     // This is the function called on app startup with a shared link if the app had been closed already.
     // It is called as the launch process is finishing and the app is almost ready to run.
     // If the URL includes the module's ShareMedia prefix, then we process the URL and return true if we know how to handle that kind of URL or false if the app is not able to.
@@ -90,7 +90,7 @@ public class SwiftReceiveSharingIntentPlugin: NSObject, FlutterPlugin, FlutterSt
         }
         return true
     }
-    
+
     // This is the function called on resuming the app from a shared link.
     // It handles requests to open a resource by a specified URL. Returning true means that it was handled successfully, false means the attempt to open the resource failed.
     // If the URL includes the module's ShareMedia prefix, then we process the URL and return true if we know how to handle that kind of URL or false if we are not able to.
@@ -102,7 +102,7 @@ public class SwiftReceiveSharingIntentPlugin: NSObject, FlutterPlugin, FlutterSt
         }
         return false
     }
-    
+
     // This function is called by other modules like Firebase DeepLinks.
     // It tells the delegate that data for continuing an activity is available. Returning true means that our module handled the activity and that others do not have to. Returning false tells
     // iOS that our app did not handle the activity.
@@ -117,11 +117,11 @@ public class SwiftReceiveSharingIntentPlugin: NSObject, FlutterPlugin, FlutterSt
         }
         return false
     }
-    
+
     private func handleUrl(url: URL?, setInitialData: Bool) -> Bool {
         if let url = url {
-            let appDomain = Bundle.main.bundleIdentifier!
-            let userDefaults = UserDefaults(suiteName: "group.\(appDomain)")
+            let appGroup = Bundle.main.object(forInfoDictionaryKey: "AppGroup") as? String
+            let userDefaults = UserDefaults(suiteName: appGroup ?? "group.\(Bundle.main.bundleIdentifier!)")
             if url.fragment == "media" {
                 if let key = url.host?.components(separatedBy: "=").last,
                     let json = userDefaults?.object(forKey: key) as? Data {
@@ -136,7 +136,7 @@ public class SwiftReceiveSharingIntentPlugin: NSObject, FlutterPlugin, FlutterSt
                         } else if ($0.type == .video && $0.thumbnail == nil) {
                             return SharedMediaFile.init(path: path, thumbnail: nil, duration: $0.duration, type: $0.type)
                         }
-                        
+
                         return SharedMediaFile.init(path: path, thumbnail: nil, duration: $0.duration, type: $0.type)
                     }
                     latestMedia = sharedMediaFiles
@@ -183,8 +183,8 @@ public class SwiftReceiveSharingIntentPlugin: NSObject, FlutterPlugin, FlutterSt
         latestText = nil
         return false
     }
-    
-    
+
+
     public func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
         if (arguments as! String? == "media") {
             eventSinkMedia = events;
@@ -195,7 +195,7 @@ public class SwiftReceiveSharingIntentPlugin: NSObject, FlutterPlugin, FlutterSt
         }
         return nil;
     }
-    
+
     public func onCancel(withArguments arguments: Any?) -> FlutterError? {
         if (arguments as! String? == "media") {
             eventSinkMedia = nil;
@@ -206,7 +206,7 @@ public class SwiftReceiveSharingIntentPlugin: NSObject, FlutterPlugin, FlutterSt
         }
         return nil;
     }
-    
+
     private func getAbsolutePath(for identifier: String) -> String? {
         if (identifier.starts(with: "file://") || identifier.starts(with: "/var/mobile/Media") || identifier.starts(with: "/private/var/mobile")) {
             return identifier.replacingOccurrences(of: "file://", with: "")
@@ -218,7 +218,7 @@ public class SwiftReceiveSharingIntentPlugin: NSObject, FlutterPlugin, FlutterSt
         let (url, _) = getFullSizeImageURLAndOrientation(for: phAsset!)
         return url
     }
-    
+
     private func getFullSizeImageURLAndOrientation(for asset: PHAsset)-> (String?, Int) {
            var url: String? = nil
            var orientation: Int = 0
@@ -233,12 +233,12 @@ public class SwiftReceiveSharingIntentPlugin: NSObject, FlutterPlugin, FlutterSt
            semaphore.wait()
            return (url, orientation)
        }
-    
+
     private func decode(data: Data) -> [SharedMediaFile] {
         let encodedData = try? JSONDecoder().decode([SharedMediaFile].self, from: data)
         return encodedData!
     }
-    
+
     private func toJson(data: [SharedMediaFile]?) -> String? {
         if data == nil {
             return nil
@@ -247,14 +247,14 @@ public class SwiftReceiveSharingIntentPlugin: NSObject, FlutterPlugin, FlutterSt
          let json = String(data: encodedData!, encoding: .utf8)!
         return json
     }
-    
+
     class SharedMediaFile: Codable {
         var path: String;
         var thumbnail: String?; // video thumbnail
         var duration: Double?; // video duration in milliseconds
         var type: SharedMediaType;
-        
-        
+
+
         init(path: String, thumbnail: String?, duration: Double?, type: SharedMediaType) {
             self.path = path
             self.thumbnail = thumbnail
@@ -262,7 +262,7 @@ public class SwiftReceiveSharingIntentPlugin: NSObject, FlutterPlugin, FlutterSt
             self.type = type
         }
     }
-    
+
     enum SharedMediaType: Int, Codable {
         case image
         case video
